@@ -8,55 +8,91 @@ router.post("/register", async (req, res) => {
   try {
     const { name, email, password, role, consent } = req.body;
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+    // ✅ Basic validation
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        message: "Name, email, and password are required"
+      });
     }
 
-    const hashed = await bcrypt.hash(password, 10);
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        message: "User already exists"
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     await User.create({
       name,
       email,
-      password: hashed,
-      role,
-      consent
+      password: hashedPassword,
+      role: role || "patient",
+      consent: consent ?? false
     });
 
-    res.json({ message: "Registered successfully" });
+    res.status(201).json({
+      message: "Registered successfully"
+    });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Registration failed" });
+    console.error("REGISTER ERROR:", err);
+    res.status(500).json({
+      message: "Registration failed"
+    });
   }
 });
 
 /* ================= LOGIN ================= */
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body; // ✅ FIXED
+    const { email, password } = req.body;
+
+    // ✅ Validate inputs
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required"
+      });
+    }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({
+        message: "Invalid email or password"
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({
+        message: "Invalid email or password"
+      });
     }
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES || "1d" }
+      {
+        expiresIn: process.env.JWT_EXPIRES || "1d"
+      }
     );
 
-    res.json({ token });
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Login failed" });
+    console.error("LOGIN ERROR:", err);
+    res.status(500).json({
+      message: "Login failed"
+    });
   }
 });
 
